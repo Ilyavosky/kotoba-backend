@@ -15,3 +15,47 @@ wheels/
 .venv/
 venv/
 env/
+
+# Variables de entorno 
+.env
+.env.local
+.env.*.local
+
+# Mypy 
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff 
+.ruff_cache/
+
+# Pytest 
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Build / distribución
+dist/
+build/
+*.egg-info/
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Jupyter (por si acaso)
+.ipynb_checkpoints/
