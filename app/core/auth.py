@@ -3,9 +3,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from app.core.config import settings
 from app.schemas.user import CurrentUser
+from typing import Annotated
 
+# We use Auto_error=False so it lets us return 401 instead of FastAPI's default 403
 _bearer = HTTPBearer(auto_error=False)
 
+#Async function created to get the current user, checks the credentials using the fastapi security HTTAuthorizationCredentials in order to check if the JWT is valid
 async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)):
     if credentials is None:
         raise HTTPException(
@@ -13,14 +16,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
             detail="Invalid or missing token",
         )
     try:
-        payload = jwt.decode(credentials.credentials, settings.SUPABASE_JWT_SECRET, algorithms=['HS256'])
+        #Stores the validation in the payload variable where it uses python jose to decode the jwt body
+        payload = jwt.decode(credentials.credentials, settings.SUPABASE_JWT_SECRET, algorithms=['HS256']) 
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing token",
         )
+    #This function uses the CurrentUser class and validates the attributes with pydantic    
     return CurrentUser.model_validate(payload)
 
-from typing import Annotated
 
 AuthUser = Annotated[CurrentUser, Depends(get_current_user)]
