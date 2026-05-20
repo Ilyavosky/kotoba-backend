@@ -27,4 +27,4 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
     return CurrentUser.model_validate(payload)
 
 
-AuthUser = Annotated[CurrentUser, Depends(get_current_user)]
+AuthUser = Annotated[CurrentUser, Depends(get_current_user)]    
