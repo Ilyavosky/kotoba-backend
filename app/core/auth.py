@@ -17,7 +17,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
         )
     try:
         #Stores the validation in the payload variable where it uses python jose to decode the jwt body
-        payload = jwt.decode(credentials.credentials, settings.SUPABASE_JWT_SECRET, algorithms=['HS256']) 
+        payload = jwt.decode(credentials.credentials, settings.SUPABASE_JWT_SECRET, algorithms=['HS256'], audience="authenticated") 
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
