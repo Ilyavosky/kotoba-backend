@@ -8,7 +8,7 @@ Covers:
   - Valid token → 200 + correct user payload
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,7 +31,7 @@ def _make_token(
     exp_offset: int = 3600,
 ) -> str:
     """Builds a signed JWT with the given parameters."""
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     return jwt.encode(
         {
             "sub": user_id,
@@ -67,16 +67,19 @@ def test_no_token_returns_401(client: TestClient) -> None:
 
 def test_invalid_signature_returns_401(client: TestClient) -> None:
     token = _make_token(secret="wrong-secret-completely-different!")
-    assert client.get("/v1/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    response = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
 
 
 def test_expired_token_returns_401(client: TestClient) -> None:
     token = _make_token(exp_offset=-1)
-    assert client.get("/v1/me", headers={"Authorization": f"Bearer {token}"}).status_code == 401
+    response = client.get("/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
 
 
 def test_malformed_token_returns_401(client: TestClient) -> None:
-    assert client.get("/v1/me", headers={"Authorization": "Bearer not-a-jwt"}).status_code == 401
+    response = client.get("/v1/me", headers={"Authorization": "Bearer not-a-jwt"})
+    assert response.status_code == 401
 
 
 def test_valid_token_returns_200(client: TestClient) -> None:
