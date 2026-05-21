@@ -27,10 +27,10 @@ async def get_current_user(credentials:
                              algorithms=['HS256'],
                              audience="authenticated")
     except JWTError as err:
-        raise HTTPException from err(
+        raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing token",
-        )
+        )from err
     #This function uses the CurrentUser class
     #And validates the attributes with pydantic
     return CurrentUser.model_validate(payload)
