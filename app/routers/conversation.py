@@ -1,7 +1,9 @@
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
 from app.core.auth import AuthUser
+from app.core.deps import get_groq_client
 from app.schemas.conversation import ConversationTurnResponse
+from app.services.conversation_orchestration import ConversationOrchestrationService
 
 router = APIRouter(prefix="/v1/conversation", tags=["conversation"])
 
@@ -9,10 +11,9 @@ router = APIRouter(prefix="/v1/conversation", tags=["conversation"])
 async def conversation_turn(
     current_user: AuthUser,
     audio_file: UploadFile = File(...),
-    lesson_id: str = Form(...)
+    lesson_id: str = Form(...),
+    groq_client = Depends(get_groq_client)
     ) -> ConversationTurnResponse:
-    return ConversationTurnResponse(
-    transcription="stub: audio recibido",
-    agent_response="stub: respuesta del agente",
-    audio_url=None,
-)
+        audio_bytes = await audio_file.read()
+        service = ConversationOrchestrationService(groq_client)
+        return await service.process_turn(audio_bytes, lesson_id, current_user.user_id)
