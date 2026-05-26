@@ -13,8 +13,15 @@ class ConversationOrchestrationService:
         self.groq_client = groq_client
         self.repository = repository
     async def process_turn(self, audio_bytes, lesson_id, user_id):
-        history = await self.repository.get_history(user_id, lesson_id)
         structlog.contextvars.bind_contextvars(user_id=user_id, lesson_id=lesson_id)
+
+        try:    
+            history = await self.repository.get_history(user_id, lesson_id)
+        except Exception as er:
+            history = []
+            logger.warning("redis_unavailable", error=str(er), fallback="empty_context")
+            
+        
         try:
             t0 = time.perf_counter()
             transcription = self.groq_client.audio.transcriptions.create(
