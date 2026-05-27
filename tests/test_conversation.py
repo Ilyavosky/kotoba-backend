@@ -9,13 +9,13 @@ Covers:
 
 import io
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
 
-from app.core.deps import get_groq_client
+from app.core.deps import get_groq_client, get_redis_repository
 from app.main import app
 
 # ── Test constants ────────────────────────────────────────────────────────────
@@ -143,3 +143,73 @@ def test_conversation_turn_asr_failure_returns_502(
         app.dependency_overrides.clear()
 
     assert response.status_code == 502
+
+
+# ── K-10: Redis context fixtures ──────────────────────────────────────────────
+
+@pytest.fixture()
+def mock_redis_repository() -> MagicMock:
+    """Redis repository whose calls succeed silently."""
+    repo = MagicMock()
+    repo.get_history = AsyncMock(return_value=[])
+    repo.append_turn = AsyncMock(return_value=None)
+    return repo
+
+
+@pytest.fixture()
+def mock_redis_repository_failure() -> MagicMock:
+    """Redis repository whose get_history raises to simulate unavailability."""
+    repo = MagicMock()
+    repo.get_history = AsyncMock(side_effect=Exception("Redis unavailable"))
+    repo.append_turn = AsyncMock(return_value=None)
+    return repo
+
+
+# ── K-10: Tests ───────────────────────────────────────────────────────────────
+
+def test_conversation_turn_saves_to_redis(
+    client: TestClient,
+    mock_groq_success: MagicMock,
+    mock_redis_repository: MagicMock,
+) -> None:
+    """Successful turn → append_turn called with correct user_id and lesson_id."""
+    app.dependency_overrides[get_groq_client] = lambda: mock_groq_success
+    app.dependency_overrides[get_redis_repository] = lambda: mock_redis_repository
+    try:
+        response = client.post(
+            "/v1/conversation/turn",
+            headers=_auth_headers(),
+            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            data={"lesson_id": TEST_LESSON_ID},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    mock_redis_repository.append_turn.assert_called_once_with(
+        TEST_USER_ID,
+        TEST_LESSON_ID,
+        "hola, ¿cómo estás?",
+        "stub: respuesta del agente",
+    )
+
+
+def test_conversation_turn_redis_failure_returns_200(
+    client: TestClient,
+    mock_groq_success: MagicMock,
+    mock_redis_repository_failure: MagicMock,
+) -> None:
+    """Redis unavailable → endpoint still returns 200 with empty context fallback."""
+    app.dependency_overrides[get_groq_client] = lambda: mock_groq_success
+    app.dependency_overrides[get_redis_repository] = lambda: mock_redis_repository_failure
+    try:
+        response = client.post(
+            "/v1/conversation/turn",
+            headers=_auth_headers(),
+            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            data={"lesson_id": TEST_LESSON_ID},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200

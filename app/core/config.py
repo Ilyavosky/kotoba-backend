@@ -12,6 +12,10 @@ class Settings(BaseSettings):
                                    description="Anon Key from the Supabase project")
     SUPABASE_JWT_SECRET: str = Field(min_length=1,
                                      description="JWT Secret from the Supabase project")
+    UPSTASH_REDIS_URL: str = Field(min_length= 1,
+                                    description="Upstash Redis instance URL")
+    UPSTASH_REDIS_TOKEN: str = Field(min_length=1,
+                                      description="Upstash Redis REST authentication token")
 
     model_config = SettingsConfigDict(
         env_file=".env",
