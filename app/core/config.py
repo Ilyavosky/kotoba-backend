@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_URL: str = Field(min_length= 1,
                                     description="Upstash Redis instance URL")
     UPSTASH_REDIS_TOKEN: str = Field(min_length=1,
-                                      description="Upstash Redis REST authentication token")
+                                     description="Upstash Redis auth token")
 
     model_config = SettingsConfigDict(
         env_file=".env",

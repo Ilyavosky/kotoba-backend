@@ -1,10 +1,9 @@
 import time
 
 import structlog
+from fastapi import HTTPException
 
 from app.schemas.conversation import ConversationTurnResponse
-
-from fastapi import HTTPException
 
 logger = structlog.get_logger(__name__)
 
@@ -15,13 +14,13 @@ class ConversationOrchestrationService:
     async def process_turn(self, audio_bytes, lesson_id, user_id):
         structlog.contextvars.bind_contextvars(user_id=user_id, lesson_id=lesson_id)
 
-        try:    
+        try:
             history = await self.repository.get_history(user_id, lesson_id)
         except Exception as er:
-            history = []
+            history = []  # noqa: F841
             logger.warning("redis_unavailable", error=str(er), fallback="empty_context")
-            
-        
+
+
         try:
             t0 = time.perf_counter()
             transcription = self.groq_client.audio.transcriptions.create(
@@ -39,9 +38,11 @@ class ConversationOrchestrationService:
                 status_code=502,
                 detail="ASR service unavailable"
                 )from e
-        
-        await self.repository.append_turn(user_id, lesson_id, transcription.text, "stub: respuesta del agente")
-        
+
+        await self.repository.append_turn(
+            user_id, lesson_id, transcription.text, "stub: respuesta del agente"
+        )
+
         return ConversationTurnResponse(
             transcription= transcription.text,
             agent_response="stub: respuesta del agente",

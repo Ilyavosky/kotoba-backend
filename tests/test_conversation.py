@@ -103,7 +103,7 @@ def test_conversation_turn_success(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
@@ -136,7 +136,7 @@ def test_conversation_turn_asr_failure_returns_502(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
@@ -179,7 +179,7 @@ def test_conversation_turn_saves_to_redis(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
@@ -201,12 +201,14 @@ def test_conversation_turn_redis_failure_returns_200(
 ) -> None:
     """Redis unavailable → endpoint still returns 200 with empty context fallback."""
     app.dependency_overrides[get_groq_client] = lambda: mock_groq_success
-    app.dependency_overrides[get_redis_repository] = lambda: mock_redis_repository_failure
+    app.dependency_overrides[get_redis_repository] = (  # noqa: E501
+        lambda: mock_redis_repository_failure
+    )
     try:
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
