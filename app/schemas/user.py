@@ -6,6 +6,4 @@ class CurrentUser(BaseModel):
     email: str = Field(..., description="Current User email")
     role: str = Field(default="authenticated")
 
-    model_config = ConfigDict(
-        populate_by_name= True
-    )
+    model_config = ConfigDict(populate_by_name=True)

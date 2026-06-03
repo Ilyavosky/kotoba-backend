@@ -28,6 +28,7 @@ TEST_LESSON_ID = "lesson-001"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_token(
     *,
     secret: str = TEST_SECRET,
@@ -64,9 +65,11 @@ def _fake_audio() -> bytes:
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     import app.core.config as config_module
+
     monkeypatch.setattr(config_module.settings, "SUPABASE_JWT_SECRET", TEST_SECRET)
     return TestClient(app, raise_server_exceptions=False)
 
@@ -85,13 +88,12 @@ def mock_groq_success() -> MagicMock:
 def mock_groq_asr_failure() -> MagicMock:
     """Groq client whose ASR call raises an exception."""
     groq = MagicMock()
-    groq.audio.transcriptions.create.side_effect = Exception(
-        "Groq ASR unavailable"
-    )
+    groq.audio.transcriptions.create.side_effect = Exception("Groq ASR unavailable")
     return groq
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
+
 
 def test_conversation_turn_success(
     client: TestClient,
@@ -103,7 +105,9 @@ def test_conversation_turn_success(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
@@ -136,7 +140,9 @@ def test_conversation_turn_asr_failure_returns_502(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
@@ -146,6 +152,7 @@ def test_conversation_turn_asr_failure_returns_502(
 
 
 # ── K-10: Redis context fixtures ──────────────────────────────────────────────
+
 
 @pytest.fixture()
 def mock_redis_repository() -> MagicMock:
@@ -167,6 +174,7 @@ def mock_redis_repository_failure() -> MagicMock:
 
 # ── K-10: Tests ───────────────────────────────────────────────────────────────
 
+
 def test_conversation_turn_saves_to_redis(
     client: TestClient,
     mock_groq_success: MagicMock,
@@ -179,7 +187,9 @@ def test_conversation_turn_saves_to_redis(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:
@@ -208,7 +218,9 @@ def test_conversation_turn_redis_failure_returns_200(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
     finally:

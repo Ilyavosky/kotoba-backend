@@ -7,6 +7,6 @@ from app.repositories.conversation_context import ConversationContextRepository
 def get_groq_client() -> Groq:
     return Groq()
 
-async def get_redis_repository():
-    repository =ConversationContextRepository(redis_client)
-    return repository
+
+async def get_redis_repository() -> ConversationContextRepository:
+    return ConversationContextRepository(redis_client)

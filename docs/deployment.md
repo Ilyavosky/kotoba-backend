@@ -11,9 +11,9 @@ Any push to the `develop` branch triggers an automatic redeploy.
 
 ## Prerequisites
 
-- Access to the Railway project (`zoological-exploration`)
+- Access to the Railway project (`Kotoba-Backend`)
 - Access to the GitHub repository connected to the service
-- The following credentials (never hardcode these):
+- Must add the following credentials (never hardcode these):
   - Supabase URL, Anon Key, and JWT Secret
   - Upstash Redis URL and Token
 
