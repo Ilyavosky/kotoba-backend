@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, cast
 
 
 class ConversationContextRepository:
@@ -11,7 +11,7 @@ class ConversationContextRepository:
         data = await self.redis.get(key)
         if data is None:
             return []
-        return json.loads(data)
+        return cast(list[dict[Any, Any]], json.loads(data))
 
     async def append_turn(
         self, user_id: str, lesson_id: str, user_message: str, agent_response: str

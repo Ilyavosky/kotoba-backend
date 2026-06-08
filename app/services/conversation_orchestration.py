@@ -1,19 +1,25 @@
 import time
+from typing import Any
 
 import structlog
 from fastapi import HTTPException
 
+from app.repositories.conversation_context import ConversationContextRepository
 from app.schemas.conversation import ConversationTurnResponse
 
 logger = structlog.get_logger(__name__)
 
 
 class ConversationOrchestrationService:
-    def __init__(self, groq_client, repository):
+    def __init__(
+        self, groq_client: Any, repository: ConversationContextRepository
+    ) -> None:
         self.groq_client = groq_client
         self.repository = repository
 
-    async def process_turn(self, audio_bytes, lesson_id, user_id):
+    async def process_turn(
+        self, audio_bytes: bytes, lesson_id: str, user_id: str
+    ) -> ConversationTurnResponse:
         structlog.contextvars.bind_contextvars(user_id=user_id, lesson_id=lesson_id)
 
         try:
