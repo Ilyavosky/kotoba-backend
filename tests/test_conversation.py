@@ -1,13 +1,10 @@
 """
 Integration tests: POST /v1/conversation/turn
-
-Covers:
-  - Happy path: valid audio + valid token → 200 + correct JSON fields
-  - ASR failure: Groq raises exception → 502
-  - LLM failure: reserved for when LLM stage is implemented → 502
 """
 
 import io
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -15,16 +12,22 @@ import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
 
-from app.core.deps import get_groq_client, get_redis_repository
+from app.core.deps import (
+    get_agent_service,
+    get_groq_client,
+    get_lesson_repository,
+    get_redis_repository,
+    get_tts_service,
+)
 from app.main import app
 
-# ── Test constants ────────────────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────────────────────
 
 TEST_SECRET = "test-secret-only-for-pytest-never-use-in-prod!"
 TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000"
 TEST_EMAIL = "ilya@kotoba.test"
 TEST_LESSON_ID = "lesson-001"
-
+TEST_INTERVENCION = "Good try! Can you say it again?"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,7 +40,6 @@ def _make_token(
     audience: str = "authenticated",
     exp_offset: int = 3600,
 ) -> str:
-    """Builds a signed JWT with the given parameters."""
     now = int(datetime.now(UTC).timestamp())
     return jwt.encode(
         {
@@ -59,7 +61,6 @@ def _auth_headers(token: str | None = None) -> dict:
 
 
 def _fake_audio() -> bytes:
-    """Returns minimal bytes that satisfy the UploadFile field."""
     return b"RIFF\x00\x00\x00\x00WAVEfmt "
 
 
@@ -76,7 +77,6 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
 @pytest.fixture()
 def mock_groq_success() -> MagicMock:
-    """Groq client whose ASR call returns a transcription."""
     groq = MagicMock()
     transcription_result = MagicMock()
     transcription_result.text = "hola, ¿cómo estás?"
@@ -86,77 +86,36 @@ def mock_groq_success() -> MagicMock:
 
 @pytest.fixture()
 def mock_groq_asr_failure() -> MagicMock:
-    """Groq client whose ASR call raises an exception."""
     groq = MagicMock()
     groq.audio.transcriptions.create.side_effect = Exception("Groq ASR unavailable")
     return groq
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
+@pytest.fixture()
+def mock_lesson_repository() -> MagicMock:
+    repo = MagicMock()
+    repo.get_lesson = AsyncMock(return_value={"metadata": {"title": "Test Lesson"}})
+    return repo
 
 
-def test_conversation_turn_success(
-    client: TestClient,
-    mock_groq_success: MagicMock,
-) -> None:
-    """Happy path: valid audio + valid JWT → 200 with expected JSON fields."""
-    app.dependency_overrides[get_groq_client] = lambda: mock_groq_success
-    try:
-        response = client.post(
-            "/v1/conversation/turn",
-            headers=_auth_headers(),
-            files={
-                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
-            },  # noqa: E501
-            data={"lesson_id": TEST_LESSON_ID},
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["transcription"] == "hola, ¿cómo estás?"
-    assert "agent_response" in body
-    assert "audio_url" in body
-
-
-def test_conversation_turn_requires_auth(client: TestClient) -> None:
-    """No Authorization header → 401 before even reaching the service."""
-    response = client.post(
-        "/v1/conversation/turn",
-        files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
-        data={"lesson_id": TEST_LESSON_ID},
+@pytest.fixture()
+def mock_agent_service() -> MagicMock:
+    agent = MagicMock()
+    agent.generate_response = AsyncMock(
+        return_value=(TEST_INTERVENCION, {"paso_aplicado": 4})
     )
-    assert response.status_code == 401
+    return agent
 
 
-def test_conversation_turn_asr_failure_returns_502(
-    client: TestClient,
-    mock_groq_asr_failure: MagicMock,
-) -> None:
-    """ASR stage raises → endpoint must return 502, not 500."""
-    app.dependency_overrides[get_groq_client] = lambda: mock_groq_asr_failure
-    try:
-        response = client.post(
-            "/v1/conversation/turn",
-            headers=_auth_headers(),
-            files={
-                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
-            },  # noqa: E501
-            data={"lesson_id": TEST_LESSON_ID},
-        )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert response.status_code == 502
-
-
-# ── K-10: Redis context fixtures ──────────────────────────────────────────────
+@pytest.fixture()
+def mock_tts_service() -> MagicMock:
+    tts = MagicMock()
+    tts.synthesize = AsyncMock(return_value="https://supabase.test/audio.mp3")
+    return tts
 
 
 @pytest.fixture()
 def mock_redis_repository() -> MagicMock:
-    """Redis repository whose calls succeed silently."""
     repo = MagicMock()
     repo.get_history = AsyncMock(return_value=[])
     repo.append_turn = AsyncMock(return_value=None)
@@ -165,65 +124,161 @@ def mock_redis_repository() -> MagicMock:
 
 @pytest.fixture()
 def mock_redis_repository_failure() -> MagicMock:
-    """Redis repository whose get_history raises to simulate unavailability."""
     repo = MagicMock()
     repo.get_history = AsyncMock(side_effect=Exception("Redis unavailable"))
     repo.append_turn = AsyncMock(return_value=None)
     return repo
 
 
-# ── K-10: Tests ───────────────────────────────────────────────────────────────
+@contextmanager
+def _override_all(
+    mock_groq: MagicMock,
+    mock_lesson: MagicMock,
+    mock_agent: MagicMock,
+    mock_tts: MagicMock,
+    mock_redis: MagicMock,
+) -> Generator[None, None, None]:
+    app.dependency_overrides[get_groq_client] = lambda: mock_groq
+    app.dependency_overrides[get_lesson_repository] = lambda: mock_lesson
+    app.dependency_overrides[get_agent_service] = lambda: mock_agent
+    app.dependency_overrides[get_tts_service] = lambda: mock_tts
+    app.dependency_overrides[get_redis_repository] = lambda: mock_redis
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+
+
+def test_conversation_turn_success(
+    client: TestClient,
+    mock_groq_success: MagicMock,
+    mock_lesson_repository: MagicMock,
+    mock_agent_service: MagicMock,
+    mock_tts_service: MagicMock,
+    mock_redis_repository: MagicMock,
+) -> None:
+    """Happy path: valid audio + valid JWT → 200 with expected JSON fields."""
+    with _override_all(
+        mock_groq_success,
+        mock_lesson_repository,
+        mock_agent_service,
+        mock_tts_service,
+        mock_redis_repository,
+    ):
+        response = client.post(
+            "/v1/conversation/turn",
+            headers=_auth_headers(),
+            files={"audio_file": (
+                "audio.webm", io.BytesIO(_fake_audio()), "audio/webm"
+            )},  # noqa: E501
+            data={"lesson_id": TEST_LESSON_ID},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["transcription"] == "hola, ¿cómo estás?"
+    assert body["agent_response"] == TEST_INTERVENCION
+    assert body["audio_url"] == "https://supabase.test/audio.mp3"
+
+
+def test_conversation_turn_requires_auth(client: TestClient) -> None:
+    """No Authorization header → 401 before even reaching the service."""
+    response = client.post(
+        "/v1/conversation/turn",
+        files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},  # noqa: E501
+        data={"lesson_id": TEST_LESSON_ID},
+    )
+    assert response.status_code == 401
+
+
+def test_conversation_turn_asr_failure_returns_502(
+    client: TestClient,
+    mock_groq_asr_failure: MagicMock,
+    mock_lesson_repository: MagicMock,
+    mock_agent_service: MagicMock,
+    mock_tts_service: MagicMock,
+    mock_redis_repository: MagicMock,
+) -> None:
+    """ASR stage raises → endpoint must return 502, not 500."""
+    with _override_all(
+        mock_groq_asr_failure,
+        mock_lesson_repository,
+        mock_agent_service,
+        mock_tts_service,
+        mock_redis_repository,
+    ):
+        response = client.post(
+            "/v1/conversation/turn",
+            headers=_auth_headers(),
+            files={"audio_file": (
+                "audio.webm", io.BytesIO(_fake_audio()), "audio/webm"
+            )},  # noqa: E501
+            data={"lesson_id": TEST_LESSON_ID},
+        )
+
+    assert response.status_code == 502
 
 
 def test_conversation_turn_saves_to_redis(
     client: TestClient,
     mock_groq_success: MagicMock,
+    mock_lesson_repository: MagicMock,
+    mock_agent_service: MagicMock,
+    mock_tts_service: MagicMock,
     mock_redis_repository: MagicMock,
 ) -> None:
-    """Successful turn → append_turn called with correct user_id and lesson_id."""
-    app.dependency_overrides[get_groq_client] = lambda: mock_groq_success
-    app.dependency_overrides[get_redis_repository] = lambda: mock_redis_repository
-    try:
+    """Successful turn → append_turn called with correct args."""
+    with _override_all(
+        mock_groq_success,
+        mock_lesson_repository,
+        mock_agent_service,
+        mock_tts_service,
+        mock_redis_repository,
+    ):
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={
-                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
-            },  # noqa: E501
+            files={"audio_file": (
+                "audio.webm", io.BytesIO(_fake_audio()), "audio/webm"
+            )},  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
-    finally:
-        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     mock_redis_repository.append_turn.assert_called_once_with(
         TEST_USER_ID,
         TEST_LESSON_ID,
         "hola, ¿cómo estás?",
-        "stub: respuesta del agente",
+        TEST_INTERVENCION,
     )
 
 
 def test_conversation_turn_redis_failure_returns_200(
     client: TestClient,
     mock_groq_success: MagicMock,
+    mock_lesson_repository: MagicMock,
+    mock_agent_service: MagicMock,
+    mock_tts_service: MagicMock,
     mock_redis_repository_failure: MagicMock,
 ) -> None:
     """Redis unavailable → endpoint still returns 200 with empty context fallback."""
-    app.dependency_overrides[get_groq_client] = lambda: mock_groq_success
-    app.dependency_overrides[get_redis_repository] = (  # noqa: E501
-        lambda: mock_redis_repository_failure
-    )
-    try:
+    with _override_all(
+        mock_groq_success,
+        mock_lesson_repository,
+        mock_agent_service,
+        mock_tts_service,
+        mock_redis_repository_failure,
+    ):
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={
-                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
-            },  # noqa: E501
+            files={"audio_file": (
+                "audio.webm", io.BytesIO(_fake_audio()), "audio/webm"
+            )},  # noqa: E501
             data={"lesson_id": TEST_LESSON_ID},
         )
-    finally:
-        app.dependency_overrides.clear()
 
     assert response.status_code == 200

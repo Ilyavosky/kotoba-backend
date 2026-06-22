@@ -19,6 +19,21 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_TOKEN: str = Field(
         min_length=1, description="Upstash Redis auth token"
     )
+    SUPABASE_SERVICE_ROLE: str = Field(
+        min_length=1, description="Service Role from the Supabase project"
+    )
+    GROQ_API_KEY: str = Field(
+        min_length=1, description="Groq API key — used for ASR, LLM and TTS"
+    )
+    TTS_BUCKET: str = Field(
+        min_length=1, description="Supabase Storage bucket for TTS audio"
+    )
+    LESSONS_BUCKET: str = Field(
+        min_length=1, description="Supabase Storage bucket for lesson JSONs"
+    )
+    LLM_MODEL: str = Field(
+        min_length=1, description="Groq model used for the pedagogical agent"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=False, extra="ignore"
