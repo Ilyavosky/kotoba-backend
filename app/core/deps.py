@@ -5,7 +5,9 @@ from app.core.config import settings
 from app.core.redis import redis_client
 from app.repositories.conversation_context import ConversationContextRepository
 from app.repositories.lesson_repository import LessonRepository
+from app.repositories.step_state_repository import StepStateRepository
 from app.services.agent_service import AgentService, load_agent_service
+from app.services.decision_engine import DecisionEngineService
 from app.services.tts_service import TtsService
 
 # Supabase client is created once at module load — it's thread-safe and reusable
@@ -25,6 +27,10 @@ _agent_service = load_agent_service(groq_client=_groq_client, model=settings.LLM
 
 # TtsService is stateless — one instance shared across all requests
 _tts_service = TtsService(_groq_client, _supabase_client, settings.TTS_BUCKET)
+
+_step_state_repository = StepStateRepository(redis_client)
+
+_decision_engine_service = DecisionEngineService(_step_state_repository)
 
 
 def get_groq_client() -> Groq:
@@ -49,3 +55,6 @@ def get_tts_service() -> TtsService:
 
 def get_redis_repository() -> ConversationContextRepository:
     return ConversationContextRepository(redis_client)
+
+def get_decision_engine_service() -> DecisionEngineService:
+    return _decision_engine_service
