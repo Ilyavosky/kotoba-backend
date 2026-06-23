@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from typing import Literal
 
 from groq import Groq
 from supabase import Client
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 _TTS_MODEL = "playai-tts"
 _TTS_VOICE = "Fritz-PlayAI"
-_TTS_FORMAT = "mp3"
+_TTS_FORMAT: Literal["mp3"] = "mp3"
 _SIGNED_URL_TTL = 3600  # 1 hour
 
 
@@ -22,7 +23,7 @@ class TtsService:
     async def synthesize(self, text: str) -> str | None:
         """
         Converts text to audio and returns a signed Supabase URL (TTL 1h).
-        Returns None if anything fails — the conversation flow must not be interrupted.
+        Returns None if anything fails -- the conversation flow must not be interrupted.
         """
         if not text or not text.strip():
             return None
@@ -59,8 +60,8 @@ class TtsService:
             file_options={"content-type": "audio/mpeg"},
         )
 
-        result: dict[str, str] = self._supabase.storage.from_(
-            self._bucket
-        ).create_signed_url(path=filename, expires_in=_SIGNED_URL_TTL)
+        result = self._supabase.storage.from_(self._bucket).create_signed_url(
+            path=filename, expires_in=_SIGNED_URL_TTL
+        )
 
         return str(result["signedURL"])

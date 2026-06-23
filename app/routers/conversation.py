@@ -4,6 +4,7 @@ from groq import Groq
 from app.core.auth import AuthUser
 from app.core.deps import (
     get_agent_service,
+    get_decision_engine_service,
     get_groq_client,
     get_lesson_repository,
     get_redis_repository,
@@ -14,6 +15,7 @@ from app.repositories.lesson_repository import LessonRepository
 from app.schemas.conversation import ConversationTurnResponse
 from app.services.agent_service import AgentService
 from app.services.conversation_orchestration import ConversationOrchestrationService
+from app.services.decision_engine import DecisionEngineService
 from app.services.tts_service import TtsService
 
 router = APIRouter(prefix="/v1/conversation", tags=["conversation"])
@@ -29,6 +31,7 @@ async def conversation_turn(
     lesson_repository: LessonRepository = Depends(get_lesson_repository),
     agent_service: AgentService = Depends(get_agent_service),
     tts_service: TtsService = Depends(get_tts_service),
+    decision_engine: DecisionEngineService = Depends(get_decision_engine_service),
 ) -> ConversationTurnResponse:
     audio_bytes = await audio_file.read()
     service = ConversationOrchestrationService(
@@ -37,5 +40,6 @@ async def conversation_turn(
         lesson_repository=lesson_repository,
         agent_service=agent_service,
         tts_service=tts_service,
+        decision_engine=decision_engine,
     )
     return await service.process_turn(audio_bytes, lesson_id, current_user.user_id)

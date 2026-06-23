@@ -11,7 +11,7 @@ from app.schemas.domain import AgentReasoning, ConversationTurn
 
 logger = logging.getLogger(__name__)
 
-_FALLBACK_INTERVENCION = "¿Puedes contarme un poco más?"
+_FALLBACK_INTERVENCION = "Puedes contarme un poco mas?"
 _FALLBACK_RAZONAMIENTO: AgentReasoning = {"error": "invalid_json_from_llm"}
 _LLM_TIMEOUT = 15.0  # seconds
 
@@ -27,12 +27,14 @@ class AgentService:
         lesson: dict[str, object],
         history: list[ConversationTurn],
         transcription: str,
+        step_context: str,
     ) -> tuple[str, AgentReasoning]:
         user_message = json.dumps(
             {
                 "leccion": lesson,
                 "historial": history,
                 "turno_estudiante": transcription,
+                "contexto_paso": step_context,
             },
             ensure_ascii=False,
         )
@@ -67,10 +69,8 @@ class AgentService:
 
 
 def load_agent_service(groq_client: Groq, model: str) -> AgentService:
-    """
-    Reads the system prompt from disk once and returns a ready AgentService.
-    Called at module load in deps.py — prompt is cached for the lifetime of the process.
-    """
+    # Reads the system prompt from disk once and returns a ready AgentService.
+    # Called at module load in deps.py -- prompt cached for the process lifetime.
     prompt_path = Path(__file__).parent.parent.parent / "prompts" / "agent_v1.md"
     system_prompt = prompt_path.read_text(encoding="utf-8")
     return AgentService(groq_client, system_prompt, model)

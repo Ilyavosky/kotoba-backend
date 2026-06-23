@@ -7,7 +7,7 @@ from app.schemas.domain import ConversationTurn
 
 
 class ConversationContextRepository:
-    def __init__(self, redis_client: aioredis.Redis[bytes]) -> None:
+    def __init__(self, redis_client: aioredis.Redis) -> None:
         self.redis = redis_client
 
     async def get_history(self, user_id: str, lesson_id: str) -> list[ConversationTurn]:
@@ -21,6 +21,3 @@ class ConversationContextRepository:
         key = f"conv:{user_id}:{lesson_id}"
         pipe = self.redis.pipeline()
         pipe.rpush(key, json.dumps({"rol": "estudiante", "contenido": user_message}))
-        pipe.rpush(key, json.dumps({"rol": "agente", "contenido": agent_response}))
-        pipe.expire(key, 86400)
-        await pipe.execute()
