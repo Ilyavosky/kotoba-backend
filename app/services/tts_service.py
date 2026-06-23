@@ -23,7 +23,7 @@ class TtsService:
     async def synthesize(self, text: str) -> str | None:
         """
         Converts text to audio and returns a signed Supabase URL (TTL 1h).
-        Returns None if anything fails — the conversation flow must not be interrupted.
+        Returns None if anything fails -- the conversation flow must not be interrupted.
         """
         if not text or not text.strip():
             return None

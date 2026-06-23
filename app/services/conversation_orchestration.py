@@ -10,6 +10,7 @@ from app.repositories.lesson_repository import LessonRepository
 from app.schemas.conversation import ConversationTurnResponse
 from app.schemas.domain import ConversationTurn
 from app.services.agent_service import AgentService
+from app.services.decision_engine import DecisionEngineService
 from app.services.tts_service import TtsService
 
 logger = structlog.get_logger(__name__)
@@ -25,12 +26,14 @@ class ConversationOrchestrationService:
         lesson_repository: LessonRepository,
         agent_service: AgentService,
         tts_service: TtsService,
+        decision_engine: DecisionEngineService,
     ) -> None:
         self.groq_client = groq_client
         self.repository = repository
         self.lesson_repository = lesson_repository
         self.agent_service = agent_service
         self.tts_service = tts_service
+        self.decision_engine = decision_engine
 
     async def process_turn(
         self, audio_bytes: bytes, lesson_id: str, user_id: str
@@ -40,6 +43,9 @@ class ConversationOrchestrationService:
         # 1. Load lesson and conversation history
         lesson, history = await self._load_context(user_id, lesson_id)
 
+        state = await self.decision_engine.get_current_state(user_id, lesson_id)
+        step_context = self.decision_engine.get_step_context(state)
+
         # 2. Transcribe audio (ASR)
         transcription = await self._transcribe(audio_bytes)
 
@@ -48,13 +54,19 @@ class ConversationOrchestrationService:
             lesson=lesson,
             history=history,
             transcription=transcription,
+            step_context=step_context,
         )
         logger.info("agent_done", paso=razonamiento.get("paso_aplicado"))
 
-        # 4. Synthesize audio (TTS) -- never blocks the response
+        # 4. Update step state
+        await self.decision_engine.update_after_turn(
+            user_id, lesson_id, state, razonamiento
+        )
+
+        # 5. Synthesize audio (TTS) -- never blocks the response
         audio_url = await self.tts_service.synthesize(intervencion)
 
-        # 5. Persist turn to Redis
+        # 6. Persist turn to Redis
         await self._save_turn(user_id, lesson_id, transcription, intervencion)
 
         return ConversationTurnResponse(

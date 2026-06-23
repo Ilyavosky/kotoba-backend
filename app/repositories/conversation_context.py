@@ -12,7 +12,7 @@ class ConversationContextRepository:
 
     async def get_history(self, user_id: str, lesson_id: str) -> list[ConversationTurn]:
         key = f"conv:{user_id}:{lesson_id}"
-        items = await self.redis.lrange(key, 0, -1) # type: ignore[misc]
+        items = await self.redis.lrange(key, 0, -1)
         return [cast(ConversationTurn, json.loads(item)) for item in items]
 
     async def append_turn(
@@ -21,6 +21,3 @@ class ConversationContextRepository:
         key = f"conv:{user_id}:{lesson_id}"
         pipe = self.redis.pipeline()
         pipe.rpush(key, json.dumps({"rol": "estudiante", "contenido": user_message}))
-        pipe.rpush(key, json.dumps({"rol": "agente", "contenido": agent_response}))
-        pipe.expire(key, 86400)
-        await pipe.execute()
