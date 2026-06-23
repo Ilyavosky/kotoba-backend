@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import uuid
-from typing import Any
 
 from groq import Groq
 from supabase import Client
@@ -60,7 +59,7 @@ class TtsService:
             file_options={"content-type": "audio/mpeg"},
         )
 
-        result: dict[str, Any] = self._supabase.storage.from_(
+        result: dict[str, str] = self._supabase.storage.from_(
             self._bucket
         ).create_signed_url(path=filename, expires_in=_SIGNED_URL_TTL)
 

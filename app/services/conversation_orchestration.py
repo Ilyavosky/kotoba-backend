@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import Any
 
 import structlog
 from fastapi import HTTPException
@@ -9,6 +8,7 @@ from groq import Groq
 from app.repositories.conversation_context import ConversationContextRepository
 from app.repositories.lesson_repository import LessonRepository
 from app.schemas.conversation import ConversationTurnResponse
+from app.schemas.domain import ConversationTurn
 from app.services.agent_service import AgentService
 from app.services.tts_service import TtsService
 
@@ -65,7 +65,7 @@ class ConversationOrchestrationService:
 
     async def _load_context(
         self, user_id: str, lesson_id: str
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    ) -> tuple[dict[str, object], list[ConversationTurn]]:
         lesson = await self.lesson_repository.get_lesson(lesson_id)
 
         try:

@@ -2,14 +2,17 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from groq import Groq
+from groq.types.chat import ChatCompletion
+
+from app.schemas.domain import AgentReasoning, ConversationTurn
 
 logger = logging.getLogger(__name__)
 
 _FALLBACK_INTERVENCION = "¿Puedes contarme un poco más?"
-_FALLBACK_RAZONAMIENTO: dict[str, Any] = {"error": "invalid_json_from_llm"}
+_FALLBACK_RAZONAMIENTO: AgentReasoning = {"error": "invalid_json_from_llm"}
 _LLM_TIMEOUT = 15.0  # seconds
 
 
@@ -21,10 +24,10 @@ class AgentService:
 
     async def generate_response(
         self,
-        lesson: dict[str, Any],
-        history: list[dict[str, Any]],
+        lesson: dict[str, object],
+        history: list[ConversationTurn],
         transcription: str,
-    ) -> tuple[str, dict[str, Any]]:
+    ) -> tuple[str, AgentReasoning]:
         user_message = json.dumps(
             {
                 "leccion": lesson,
@@ -40,18 +43,18 @@ class AgentService:
                 timeout=_LLM_TIMEOUT,
             )
             raw = completion.choices[0].message.content or ""
-            parsed: dict[str, Any] = json.loads(raw)
+            parsed = cast(dict[str, object], json.loads(raw))
         except Exception as e:
             logger.error("agent_error: %s", e)
             return _FALLBACK_INTERVENCION, _FALLBACK_RAZONAMIENTO
 
-        intervencion: str = parsed.get("intervencion", _FALLBACK_INTERVENCION)
-        razonamiento: dict[str, Any] = parsed.get("razonamiento", {})
+        intervencion = cast(str, parsed.get("intervencion", _FALLBACK_INTERVENCION))
+        razonamiento = cast(AgentReasoning, parsed.get("razonamiento", {}))
 
         logger.info("agent_ok paso=%s", razonamiento.get("paso_aplicado"))
         return intervencion, razonamiento
 
-    def _call_llm(self, user_message: str) -> Any:
+    def _call_llm(self, user_message: str) -> ChatCompletion:
         return self._groq.chat.completions.create(
             model=self._model,
             messages=[
