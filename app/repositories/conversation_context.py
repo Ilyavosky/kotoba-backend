@@ -7,12 +7,12 @@ from app.schemas.domain import ConversationTurn
 
 
 class ConversationContextRepository:
-    def __init__(self, redis_client: aioredis.Redis[bytes]) -> None:
+    def __init__(self, redis_client: aioredis.Redis) -> None:
         self.redis = redis_client
 
     async def get_history(self, user_id: str, lesson_id: str) -> list[ConversationTurn]:
         key = f"conv:{user_id}:{lesson_id}"
-        items = await self.redis.lrange(key, 0, -1)
+        items = await self.redis.lrange(key, 0, -1) # type: ignore[misc]
         return [cast(ConversationTurn, json.loads(item)) for item in items]
 
     async def append_turn(
