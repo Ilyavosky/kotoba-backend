@@ -5,13 +5,14 @@ from app.core.logging import configure_logging
 from app.core.redis import lifespan
 from app.middleware.logging import RequestLoggingMiddleware
 from app.routers.conversation import router as conversation_router
+from app.routers.lessons import router as lessons_router
 from app.schemas.user import CurrentUser
 
 configure_logging()
 app = FastAPI(title="Kotoba Backend", version="0.1.0", lifespan=lifespan)
 app.add_middleware(RequestLoggingMiddleware)
 app.include_router(conversation_router)
-
+app.include_router(lessons_router)
 
 @app.get("/health")
 async def health() -> dict[str, str]:
