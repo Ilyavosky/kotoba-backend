@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.core.redis import redis_client
 from app.repositories.conversation_context import ConversationContextRepository
 from app.repositories.lesson_repository import LessonRepository
+from app.repositories.module_repository import ModuleRepository
 from app.repositories.step_state_repository import StepStateRepository
 from app.repositories.student_progress_repository import StudentProgressRepository
 from app.services.agent_service import AgentService, load_agent_service
@@ -35,6 +36,8 @@ _step_state_repository = StepStateRepository(redis_client)
 
 _student_progress_repository = StudentProgressRepository(_supabase_client)
 
+_module_repository = ModuleRepository(_supabase_client)
+
 _decision_engine_service = DecisionEngineService(_step_state_repository, _student_progress_repository)
 
 
@@ -60,6 +63,10 @@ def get_tts_service() -> TtsService:
 
 def get_redis_repository() -> ConversationContextRepository:
     return ConversationContextRepository(redis_client)
+
+
+def get_module_repository() -> ModuleRepository:
+    return _module_repository
 
 
 def get_decision_engine_service() -> DecisionEngineService:

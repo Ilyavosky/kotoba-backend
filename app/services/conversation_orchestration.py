@@ -7,6 +7,7 @@ from groq import Groq
 
 from app.repositories.conversation_context import ConversationContextRepository
 from app.repositories.lesson_repository import LessonRepository
+from app.repositories.module_repository import ModuleRepository
 from app.schemas.conversation import ConversationTurnResponse
 from app.schemas.domain import ConversationTurn
 from app.services.agent_service import AgentService
@@ -27,6 +28,7 @@ class ConversationOrchestrationService:
         agent_service: AgentService,
         tts_service: TtsService,
         decision_engine: DecisionEngineService,
+        module_repository: ModuleRepository,
     ) -> None:
         self.groq_client = groq_client
         self.repository = repository
@@ -34,6 +36,7 @@ class ConversationOrchestrationService:
         self.agent_service = agent_service
         self.tts_service = tts_service
         self.decision_engine = decision_engine
+        self.module_repository = module_repository
 
     async def process_turn(
         self, audio_bytes: bytes, lesson_id: str, user_id: str
@@ -59,20 +62,27 @@ class ConversationOrchestrationService:
         logger.info("agent_done", paso=razonamiento.get("paso_aplicado"))
 
         # 4. Update step state
-        await self.decision_engine.update_after_turn(
+        updated_state = await self.decision_engine.update_after_turn(
             user_id, lesson_id, state, razonamiento
         )
 
-        # 5. Synthesize audio (TTS) -- never blocks the response
+        # 5. Resolve next lesson if current lesson just completed
+        next_lesson_id: str | None = None
+        if updated_state["completed"]:
+            next_lesson_id = await self.module_repository.get_next_lesson_id(lesson_id)
+
+        # 6. Synthesize audio (TTS) -- never blocks the response
         audio_url = await self.tts_service.synthesize(intervencion)
 
-        # 6. Persist turn to Redis
+        # 7. Persist turn to Redis
         await self._save_turn(user_id, lesson_id, transcription, intervencion)
 
         return ConversationTurnResponse(
             transcription=transcription,
             agent_response=intervencion,
             audio_url=audio_url,
+            lesson_completed=updated_state["completed"],
+            next_lesson_id=next_lesson_id,
         )
 
     async def _load_context(
