@@ -1,4 +1,5 @@
 from app.repositories.step_state_repository import StepStateRepository
+from app.repositories.student_progress_repository import StudentProgressRepository
 from app.schemas.domain import AgentReasoning, StepState
 
 _TURNS_TO_ADVANCE = 2
@@ -9,8 +10,10 @@ class DecisionEngineService:
     def __init__(
         self,
         repository: StepStateRepository,
+        progress_repository: StudentProgressRepository
     ) -> None:
         self._repository = repository
+        self._progress_repository = progress_repository
 
     async def get_current_state(
         self,
@@ -20,6 +23,14 @@ class DecisionEngineService:
         state = await self._repository.get_step_state(user_id, lesson_id)
 
         if state is None:
+            progress = await self._progress_repository.get_progress(user_id, lesson_id)
+            if progress is not None:
+                return StepState(
+                    current_step=int(progress["current_step"]),
+                    turns_on_step=0,
+                    consecutive_errors=0,
+                    completed=False,
+                )
             return StepState(
                 current_step=1,
                 turns_on_step=0,
@@ -51,6 +62,13 @@ class DecisionEngineService:
                     state["completed"] = True
 
         await self._repository.save_step_state(user_id, lesson_id, state)
+        status = "completed" if state["completed"] else "in_progress"
+        await self._progress_repository.upsert_progress(
+            user_id=user_id,
+            lesson_id=lesson_id,
+            current_step=state["current_step"],
+            status=status,
+        )
         return state
 
     def get_step_context(
@@ -65,3 +83,4 @@ class DecisionEngineService:
     f"Turns on step: {state['turns_on_step']}. "
     f"Consecutive errors: {state['consecutive_errors']}."
 )
+  
