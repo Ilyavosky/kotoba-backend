@@ -20,11 +20,11 @@ router = APIRouter(prefix="/v1/progress", tags=["progress"])
 @router.get("/lesson/{lesson_id}", response_model=LessonProgressResponse)
 async def get_lesson_progress(
     lesson_id: str,
-    user: AuthUser = Depends(),
+    user: AuthUser,
     decision_engine: DecisionEngineService = Depends(get_decision_engine_service),
-):
+) -> LessonProgressResponse:
     state = await decision_engine.get_current_state(user.user_id, lesson_id)
-    
+
     if state["completed"]:
         status = "completed"
     elif state["current_step"] == 1 and state["turns_on_step"] == 0:
@@ -44,7 +44,7 @@ async def get_lesson_progress(
 @router.get("/module/{module_id}", response_model=ModuleProgressResponse)
 async def get_module_progress(
     module_id: str,
-    user: AuthUser = Depends(),
+    user: AuthUser,
     module_repo: ModuleRepository = Depends(get_module_repository),
     progress_repo: StudentProgressRepository = Depends(get_student_progress_repository),
 ) -> ModuleProgressResponse:
