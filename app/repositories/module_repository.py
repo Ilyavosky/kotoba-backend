@@ -42,3 +42,22 @@ class ModuleRepository:
             return None  # last lesson in module
 
         return lesson_ids[idx + 1]
+
+    async def get_lesson_ids(self, module_id: str) -> list[str]:
+        """Return the ordered list of lesson_ids for a given module_id.
+
+        Returns an empty list if the module does not exist or is inactive.
+        """
+        result = await asyncio.to_thread(
+            lambda: self._client.table("modules")
+            .select("lesson_ids")
+            .eq("id", module_id)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+
+        if not result.data:
+            return []
+
+        return result.data[0]["lesson_ids"]

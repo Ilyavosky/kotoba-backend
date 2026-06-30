@@ -71,3 +71,6 @@ def get_module_repository() -> ModuleRepository:
 
 def get_decision_engine_service() -> DecisionEngineService:
     return _decision_engine_service
+
+def get_student_progress_repository() -> StudentProgressRepository:
+    return _student_progress_repository
