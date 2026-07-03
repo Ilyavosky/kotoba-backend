@@ -1,0 +1,466 @@
+{
+  "info": {
+    "name": "Kotoba Backend",
+    "description": "Colección completa para verificar el funcionamiento del backend de Kotoba.\n\nCubre:\n- Health check\n- Auth (GET /v1/me)\n- Lessons (GET /v1/lessons/:id)\n- Conversation turn (POST /v1/conversation/turn)\n- K-06.1: Student model persistente (lesson_completed, step progression)\n- K-05.2: Multi-lección (next_lesson_id)\n\nPre-requisito: configurar el environment 'Kotoba' con las variables listadas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://kotoba-backend-production-e6b7.up.railway.app",
+      "description": "Production URL. Cambiar a http://localhost:8000 para desarrollo local."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "JWT de Supabase Auth. Obtener desde el cliente Flutter o Supabase Dashboard."
+    },
+    {
+      "key": "lesson_id",
+      "value": "",
+      "description": "UUID de la lección a usar en los tests de /turn."
+    },
+    {
+      "key": "last_next_lesson_id",
+      "value": "",
+      "description": "Se auto-llena cuando una lección se completa y devuelve next_lesson_id."
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Body is {status: ok}', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Auth",
+      "item": [
+        {
+          "name": "GET /v1/me — sin token (espera 401)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/me",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "me"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sin token -> 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/me — con token válido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/me",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "me"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tiene user_id', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('user_id');",
+                  "  pm.expect(body.user_id).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Lessons",
+      "item": [
+        {
+          "name": "GET /v1/lessons/:id — sin token (espera 401)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v1/lessons/{{lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "lessons", "{{lesson_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sin token -> 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/lessons/:id — con token válido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/lessons/{{lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "lessons", "{{lesson_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Respuesta es un objeto', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Conversation Turn — errores",
+      "item": [
+        {
+          "name": "POST /turn — sin token (espera 401)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/v1/conversation/turn",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "conversation", "turn"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "lesson_id", "value": "{{lesson_id}}", "type": "text" },
+                { "key": "audio_file", "type": "file", "src": [] }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sin token -> 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /turn — sin lesson_id (espera 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/conversation/turn",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "conversation", "turn"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "audio_file", "type": "file", "src": [] }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sin lesson_id -> 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Conversation Turn — happy path (K-06.1)",
+      "item": [
+        {
+          "name": "POST /turn — turno normal (lección en progreso)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/conversation/turn",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "conversation", "turn"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "lesson_id", "value": "{{lesson_id}}", "type": "text" },
+                {
+                  "key": "audio_file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Adjuntar archivo de audio (webm/wav/mp3)"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('Response shape correcta', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.all.keys(",
+                  "    'transcription', 'agent_response', 'audio_url',",
+                  "    'lesson_completed', 'next_lesson_id'",
+                  "  );",
+                  "});",
+                  "",
+                  "pm.test('transcription es string no vacío', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.transcription).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('agent_response es string no vacío', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.agent_response).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "// K-06.1: Verificar campos de estado del estudiante",
+                  "pm.test('[K-06.1] lesson_completed es booleano', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.lesson_completed).to.be.a('boolean');",
+                  "});",
+                  "",
+                  "// K-05.2: Si la lección no está completa, next_lesson_id debe ser null",
+                  "pm.test('[K-05.2] Si no completa, next_lesson_id es null', () => {",
+                  "  const body = pm.response.json();",
+                  "  if (!body.lesson_completed) {",
+                  "    pm.expect(body.next_lesson_id).to.be.null;",
+                  "  }",
+                  "});",
+                  "",
+                  "// Guardar next_lesson_id si la lección se completó",
+                  "const body = pm.response.json();",
+                  "if (body.lesson_completed && body.next_lesson_id) {",
+                  "  pm.collectionVariables.set('last_next_lesson_id', body.next_lesson_id);",
+                  "  console.log('Leccion completada. next_lesson_id:', body.next_lesson_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /turn — verificar persistencia Redis/Supabase (segundo turno)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/conversation/turn",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "conversation", "turn"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "lesson_id", "value": "{{lesson_id}}", "type": "text" },
+                {
+                  "key": "audio_file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Adjuntar audio del segundo turno"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 en segundo turno', () => pm.response.to.have.status(200));",
+                  "",
+                  "// K-06.1: El step state debe haberse recuperado de Redis/Supabase.",
+                  "// Si el primer turno avanzó el step, este turno debería estar",
+                  "// en un step >= 1 (verificar en los logs del servidor).",
+                  "pm.test('[K-06.1] Response shape presente en segundo turno', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('lesson_completed');",
+                  "  pm.expect(body).to.have.property('next_lesson_id');",
+                  "});",
+                  "",
+                  "console.log('Segundo turno - lesson_completed:', pm.response.json().lesson_completed);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Multi-lección (K-05.2)",
+      "item": [
+        {
+          "name": "POST /turn — siguiente lección (usar next_lesson_id anterior)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/conversation/turn",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "conversation", "turn"]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "lesson_id",
+                  "value": "{{last_next_lesson_id}}",
+                  "type": "text",
+                  "description": "Usar el next_lesson_id guardado de la lección anterior"
+                },
+                {
+                  "key": "audio_file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Adjuntar audio para la nueva lección"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const nextId = pm.collectionVariables.get('last_next_lesson_id');",
+                  "if (!nextId) {",
+                  "  console.warn('AVISO: last_next_lesson_id esta vacio. Ejecutar primero un turno que complete una leccion.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 en nueva leccion', () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test('[K-05.2] Nueva leccion inicia en step 1 (lesson_completed=false)', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.lesson_completed).to.be.false;",
+                  "  pm.expect(body.next_lesson_id).to.be.null;",
+                  "});",
+                  "",
+                  "pm.test('[K-05.2] Tiene transcripcion y respuesta del agente', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.transcription).to.be.a('string').and.not.empty;",
+                  "  pm.expect(body.agent_response).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /v1/lessons/:next_id — verificar que la siguiente lección existe",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/lessons/{{last_next_lesson_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "lessons", "{{last_next_lesson_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('[K-05.2] La siguiente leccion existe en Supabase', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta contiene datos de la leccion', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.be.an('object').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
