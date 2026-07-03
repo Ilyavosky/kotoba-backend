@@ -8,6 +8,7 @@ from app.repositories.lesson_repository import LessonRepository
 from app.repositories.module_repository import ModuleRepository
 from app.repositories.step_state_repository import StepStateRepository
 from app.repositories.student_progress_repository import StudentProgressRepository
+from app.repositories.decision_log_repository import DecisionLogRepository
 from app.services.agent_service import AgentService, load_agent_service
 from app.services.decision_engine import DecisionEngineService
 from app.services.tts_service import TtsService
@@ -38,7 +39,13 @@ _student_progress_repository = StudentProgressRepository(_supabase_client)
 
 _module_repository = ModuleRepository(_supabase_client)
 
-_decision_engine_service = DecisionEngineService(_step_state_repository, _student_progress_repository)
+_decision_log_repository = DecisionLogRepository(_supabase_client)
+
+_decision_engine_service = DecisionEngineService(
+    _step_state_repository,
+    _student_progress_repository,
+    _decision_log_repository,
+)
 
 
 def get_groq_client() -> Groq:
@@ -71,3 +78,6 @@ def get_module_repository() -> ModuleRepository:
 
 def get_decision_engine_service() -> DecisionEngineService:
     return _decision_engine_service
+
+def get_decision_log_repository() -> DecisionLogRepository:
+    return _decision_log_repository
