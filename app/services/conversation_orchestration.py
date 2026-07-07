@@ -61,21 +61,27 @@ class ConversationOrchestrationService:
         )
         logger.info("agent_done", paso=razonamiento.get("paso_aplicado"))
 
-        # 4. Update step state
+        # 4. Kick off TTS concurrently -- it only needs `intervencion`, so it
+        # overlaps with the state update and Redis persistence below.
+        # It degrades gracefully: synthesize() catches everything and returns
+        # None on failure, so awaiting it can never break the response.
+        tts_task = asyncio.create_task(self.tts_service.synthesize(intervencion))
+
+        # 5. Update step state
         updated_state = await self.decision_engine.update_after_turn(
             user_id, lesson_id, state, razonamiento
         )
 
-        # 5. Resolve next lesson if current lesson just completed
+        # 6. Resolve next lesson if current lesson just completed
         next_lesson_id: str | None = None
         if updated_state["completed"]:
             next_lesson_id = await self.module_repository.get_next_lesson_id(lesson_id)
 
-        # 6. Synthesize audio (TTS) -- never blocks the response
-        audio_url = await self.tts_service.synthesize(intervencion)
-
         # 7. Persist turn to Redis
         await self._save_turn(user_id, lesson_id, transcription, intervencion)
+
+        # 8. Collect the TTS result (already running since step 4)
+        audio_url = await tts_task
 
         return ConversationTurnResponse(
             transcription=transcription,

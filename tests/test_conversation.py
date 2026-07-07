@@ -45,7 +45,7 @@ def _make_token(
     exp_offset: int = 3600,
 ) -> str:
     now = int(datetime.now(UTC).timestamp())
-    return jwt.encode(
+    return str(jwt.encode(
         {
             "sub": user_id,
             "email": email,
@@ -56,7 +56,7 @@ def _make_token(
         },
         secret,
         algorithm="HS256",
-    )
+    ))
 
 
 def _auth_headers(token: str | None = None) -> dict:
@@ -121,7 +121,10 @@ def mock_lesson_repository() -> MagicMock:
 def mock_agent_service() -> MagicMock:
     agent = MagicMock()
     agent.generate_response = AsyncMock(
-        return_value=(TEST_INTERVENCION, {"paso_aplicado": "4", "error_detectado": None})
+        return_value=(
+            TEST_INTERVENCION,
+            {"paso_aplicado": "4", "error_detectado": None},
+        )
     )
     return agent
 
@@ -242,7 +245,9 @@ def test_conversation_turn_success(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -286,7 +291,9 @@ def test_conversation_turn_asr_failure_returns_502(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -316,7 +323,9 @@ def test_conversation_turn_saves_to_redis(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -352,7 +361,9 @@ def test_conversation_turn_redis_failure_returns_200(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -385,7 +396,9 @@ def test_turn_in_progress_lesson_completed_false(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -418,7 +431,9 @@ def test_decision_engine_called_with_correct_args(
         client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -457,7 +472,9 @@ def test_lesson_completion_sets_lesson_completed_true(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -490,7 +507,9 @@ def test_lesson_completion_last_in_module_returns_null_next(
         response = client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 
@@ -523,7 +542,9 @@ def test_module_repository_not_called_when_lesson_not_completed(
         client.post(
             "/v1/conversation/turn",
             headers=_auth_headers(),
-            files={"audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")},
+            files={
+                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
+            },
             data={"lesson_id": TEST_LESSON_ID},
         )
 

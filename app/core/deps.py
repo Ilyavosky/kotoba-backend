@@ -4,11 +4,11 @@ from supabase import Client, create_client
 from app.core.config import settings
 from app.core.redis import redis_client
 from app.repositories.conversation_context import ConversationContextRepository
+from app.repositories.decision_log_repository import DecisionLogRepository
 from app.repositories.lesson_repository import LessonRepository
 from app.repositories.module_repository import ModuleRepository
 from app.repositories.step_state_repository import StepStateRepository
 from app.repositories.student_progress_repository import StudentProgressRepository
-from app.repositories.decision_log_repository import DecisionLogRepository
 from app.services.agent_service import AgentService, load_agent_service
 from app.services.decision_engine import DecisionEngineService
 from app.services.tts_service import TtsService
