@@ -1,7 +1,9 @@
 from groq import Groq
 from supabase import Client, create_client
 
+from app.core.capacity import CapacityLimiter
 from app.core.config import settings
+from app.core.rate_limit import RateLimiter
 from app.core.redis import redis_client
 from app.repositories.conversation_context import ConversationContextRepository
 from app.repositories.decision_log_repository import DecisionLogRepository
@@ -47,6 +49,13 @@ _decision_engine_service = DecisionEngineService(
     _decision_log_repository,
 )
 
+# rate limiter for all /turn requests in this worker
+_turn_capacity_limiter = CapacityLimiter(
+    settings.MAX_CONCURRENT_TURNS, settings.TURN_QUEUE_TIMEOUT_SECONDS
+)
+
+_rate_limiter = RateLimiter(redis_client, settings.RATE_LIMIT_TURNS_PER_MINUTE)
+
 
 def get_groq_client() -> Groq:
     return _groq_client
@@ -81,5 +90,15 @@ def get_decision_engine_service() -> DecisionEngineService:
 
 def get_student_progress_repository() -> StudentProgressRepository:
     return _student_progress_repository
+
+
 def get_decision_log_repository() -> DecisionLogRepository:
     return _decision_log_repository
+
+
+def get_turn_capacity_limiter() -> CapacityLimiter:
+    return _turn_capacity_limiter
+
+
+def get_rate_limiter() -> RateLimiter:
+    return _rate_limiter
