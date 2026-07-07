@@ -35,6 +35,20 @@ class Settings(BaseSettings):
         min_length=1, description="Groq model used for the pedagogical agent"
     )
 
+    # K-07.2 — /turn stability under load (all overridable via env)
+    MAX_AUDIO_BYTES: int = Field(
+        default=5_242_880, gt=0, description="Max audio upload size for /turn (5 MB)"
+    )
+    MAX_CONCURRENT_TURNS: int = Field(
+        default=16, gt=0, description="Max /turn requests processed concurrently"
+    )
+    TURN_QUEUE_TIMEOUT_SECONDS: float = Field(
+        default=5.0, gt=0, description="Max wait for a /turn slot before 503"
+    )
+    RATE_LIMIT_TURNS_PER_MINUTE: int = Field(
+        default=12, gt=0, description="Per-user /turn requests allowed per minute"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=False, extra="ignore"
     )
