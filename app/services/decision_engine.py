@@ -64,7 +64,7 @@ class DecisionEngineService:
                 lesson_id=lesson_id,
             )
             return state
-        
+
         is_system_failure = (
             bool(reasoning.get("error")) or "paso_aplicado" not in reasoning
         )
