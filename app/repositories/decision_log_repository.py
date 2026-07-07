@@ -1,9 +1,10 @@
 import asyncio
-from datetime import datetime, timezone
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 import structlog
 from supabase import Client
+
 
 class DecisionLogRepository:
     def __init__(self, client: Client) -> None:
@@ -15,12 +16,12 @@ class DecisionLogRepository:
         lesson_id: str,
         step_before: int,
         step_after: int,
-        decision: Literal["advance", "stay_clean", "stay_error"],
+        decision: Literal["advance", "stay_clean", "stay_error", "system_error"],
         error_detected: str | None,
         full_reasoning: dict[str, object],
     ) -> None:
-        
-        payload = {
+
+        payload: dict[str, Any] = {
             "user_id": user_id,
             "lesson_id": lesson_id,
             "step_before": step_before,
@@ -28,7 +29,7 @@ class DecisionLogRepository:
             "decision": decision,
             "error_detected": error_detected,
             "full_reasoning": full_reasoning,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         try:
@@ -38,4 +39,8 @@ class DecisionLogRepository:
                 .execute()
             )
         except Exception:
-            structlog.get_logger().warning("decision_log_insert_failed", user_id=user_id, lesson_id=lesson_id)
+            structlog.get_logger().warning(
+                "decision_log_insert_failed",
+                user_id=user_id,
+                lesson_id=lesson_id,
+            )

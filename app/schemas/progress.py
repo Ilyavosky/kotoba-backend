@@ -1,5 +1,7 @@
 from typing import Literal
+
 from pydantic import BaseModel
+
 
 class LessonProgressResponse (BaseModel):
     lesson_id: str
@@ -12,6 +14,6 @@ class ModuleLessonProgress(BaseModel):
     lesson_id: str
     current_step: int
     status: Literal["not_started", "in_progress", "completed"]
-    
+
 class ModuleProgressResponse(BaseModel):
     lessons: list[ModuleLessonProgress]

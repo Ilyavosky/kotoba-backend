@@ -32,7 +32,7 @@ def _make_token(
 ) -> str:
     """Builds a signed JWT with the given parameters."""
     now = int(datetime.now(UTC).timestamp())
-    return jwt.encode(
+    return str(jwt.encode(
         {
             "sub": user_id,
             "email": email,
@@ -43,7 +43,7 @@ def _make_token(
         },
         secret,
         algorithm="HS256",
-    )
+    ))
 
 
 @pytest.fixture()

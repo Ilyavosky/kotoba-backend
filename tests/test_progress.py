@@ -5,7 +5,7 @@ Integration tests: GET /v1/progress/lesson/{lesson_id}
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -40,8 +40,8 @@ def _make_token(
     audience: str = "authenticated",
     exp_offset: int = 3600,
 ) -> str:
-    now = int(datetime.now(timezone.utc).timestamp())
-    return jwt.encode(
+    now = int(datetime.now(UTC).timestamp())
+    return str(jwt.encode(
         {
             "sub": user_id,
             "email": email,
@@ -52,7 +52,7 @@ def _make_token(
         },
         secret,
         algorithm="HS256",
-    )
+    ))
 
 
 def _auth_headers(token: str | None = None) -> dict:
@@ -155,8 +155,13 @@ def mock_progress_repo_with_progress() -> MagicMock:
 @contextmanager
 def _override_lesson(
     mock_engine: MagicMock,
+    mock_progress: MagicMock | None = None,
 ) -> Generator[None, None, None]:
+    if mock_progress is None:
+        mock_progress = MagicMock()
+        mock_progress.get_progress = AsyncMock(return_value=None)
     app.dependency_overrides[get_decision_engine_service] = lambda: mock_engine
+    app.dependency_overrides[get_student_progress_repository] = lambda: mock_progress
     try:
         yield
     finally:
@@ -233,6 +238,56 @@ def test_lesson_progress_completed(
     assert body["current_step"] == 6
 
 
+def test_lesson_progress_in_progress_survives_redis_ttl(
+    client: TestClient,
+) -> None:
+    """Redis expired mid-lesson: Supabase says in_progress -> must NOT regress
+    to not_started even though the reconstructed state is step 1 / 0 turns."""
+    engine = MagicMock()
+    engine.get_current_state = AsyncMock(
+        return_value=_make_step_state(current_step=1, turns_on_step=0)
+    )
+    progress_repo = MagicMock()
+    progress_repo.get_progress = AsyncMock(
+        return_value={"current_step": 1, "status": "in_progress"}
+    )
+
+    with _override_lesson(engine, progress_repo):
+        response = client.get(
+            f"/v1/progress/lesson/{TEST_LESSON_ID}",
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "in_progress"
+
+
+def test_lesson_progress_completed_survives_redis_ttl(
+    client: TestClient,
+) -> None:
+    """Completed lesson + Redis expired: /lesson must agree with /module
+    and report completed (Supabase is the source of truth for status)."""
+    engine = MagicMock()
+    engine.get_current_state = AsyncMock(
+        return_value=_make_step_state(
+            current_step=6, turns_on_step=0, completed=True
+        )
+    )
+    progress_repo = MagicMock()
+    progress_repo.get_progress = AsyncMock(
+        return_value={"current_step": 6, "status": "completed"}
+    )
+
+    with _override_lesson(engine, progress_repo):
+        response = client.get(
+            f"/v1/progress/lesson/{TEST_LESSON_ID}",
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+
 def test_lesson_progress_requires_auth(client: TestClient) -> None:
     """No JWT -> 401."""
     response = client.get(f"/v1/progress/lesson/{TEST_LESSON_ID}")
@@ -248,7 +303,9 @@ def test_module_progress_no_prior_activity(
     mock_progress_repo_no_progress: MagicMock,
 ) -> None:
     """Module with 2 lessons, user has never started -> both not_started at step 1."""
-    with _override_module(mock_module_repository_with_lessons, mock_progress_repo_no_progress):
+    with _override_module(
+        mock_module_repository_with_lessons, mock_progress_repo_no_progress
+    ):
         response = client.get(
             f"/v1/progress/module/{TEST_MODULE_ID}",
             headers=_auth_headers(),
@@ -268,7 +325,9 @@ def test_module_progress_partial(
     mock_progress_repo_with_progress: MagicMock,
 ) -> None:
     """First lesson in progress, second not started."""
-    with _override_module(mock_module_repository_with_lessons, mock_progress_repo_with_progress):
+    with _override_module(
+        mock_module_repository_with_lessons, mock_progress_repo_with_progress
+    ):
         response = client.get(
             f"/v1/progress/module/{TEST_MODULE_ID}",
             headers=_auth_headers(),

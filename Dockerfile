@@ -18,6 +18,7 @@ RUN addgroup --system kotoba && \
 COPY --from=builder /app/.venv /app/.venv
 
 COPY app/ ./app/
+COPY prompts/ ./prompts/
 
 
 USER kotoba

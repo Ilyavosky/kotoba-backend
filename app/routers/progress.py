@@ -1,3 +1,5 @@
+from typing import Literal, cast
+
 from fastapi import APIRouter, Depends
 
 from app.core.auth import AuthUser
@@ -22,15 +24,26 @@ async def get_lesson_progress(
     lesson_id: str,
     user: AuthUser,
     decision_engine: DecisionEngineService = Depends(get_decision_engine_service),
+    progress_repo: StudentProgressRepository = Depends(get_student_progress_repository),
 ) -> LessonProgressResponse:
     state = await decision_engine.get_current_state(user.user_id, lesson_id)
+    progress = await progress_repo.get_progress(user.user_id, lesson_id)
 
+    # Supabase is the durable source of truth for status -- same source that
+    # /module/{id} uses, so both endpoints can never contradict each other.
+    # Redis state only refines the numeric detail within its TTL window.
+    status: Literal["not_started", "in_progress", "completed"]
     if state["completed"]:
         status = "completed"
-    elif state["current_step"] == 1 and state["turns_on_step"] == 0:
-        status = "not_started"
-    else:
+    elif progress is not None:
+        status = cast(
+            Literal["not_started", "in_progress", "completed"], progress["status"]
+        )
+    elif state["current_step"] > 1 or state["turns_on_step"] > 0:
+        # Live Redis activity not yet persisted to Supabase
         status = "in_progress"
+    else:
+        status = "not_started"
 
     return LessonProgressResponse(
         lesson_id=lesson_id,
@@ -63,7 +76,7 @@ async def get_module_progress(
             lessons.append(ModuleLessonProgress(
                 lesson_id=lesson_id,
                 current_step=int(progress["current_step"]),
-                status=progress["status"],  # type: ignore[arg-type]
+                status=progress["status"],
             ))
 
     return ModuleProgressResponse(lessons=lessons)

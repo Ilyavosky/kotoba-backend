@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any, cast
 
 from supabase import Client
 
@@ -31,7 +32,8 @@ class ModuleRepository:
         if not result.data:
             return None
 
-        lesson_ids: list[str] = result.data[0]["lesson_ids"]
+        row = cast(dict[str, Any], result.data[0])
+        lesson_ids: list[str] = row["lesson_ids"]
 
         try:
             idx = lesson_ids.index(lesson_id)
@@ -60,4 +62,5 @@ class ModuleRepository:
         if not result.data:
             return []
 
-        return result.data[0]["lesson_ids"]
+        row = cast(dict[str, Any], result.data[0])
+        return cast(list[str], row["lesson_ids"])
