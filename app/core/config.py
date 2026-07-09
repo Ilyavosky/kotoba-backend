@@ -49,6 +49,11 @@ class Settings(BaseSettings):
         default=12, gt=0, description="Per-user /turn requests allowed per minute"
     )
 
+    # K-07.3 — telemetry ingestion
+    TELEMETRY_MAX_BATCH: int = Field(
+        default=50, gt=0, description="Max telemetry events accepted per request"
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=False, extra="ignore"
     )

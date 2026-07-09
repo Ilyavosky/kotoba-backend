@@ -11,6 +11,7 @@ from app.repositories.lesson_repository import LessonRepository
 from app.repositories.module_repository import ModuleRepository
 from app.repositories.step_state_repository import StepStateRepository
 from app.repositories.student_progress_repository import StudentProgressRepository
+from app.repositories.telemetry_repository import TelemetryRepository
 from app.services.agent_service import AgentService, load_agent_service
 from app.services.decision_engine import DecisionEngineService
 from app.services.tts_service import TtsService
@@ -55,6 +56,9 @@ _turn_capacity_limiter = CapacityLimiter(
 )
 
 _rate_limiter = RateLimiter(redis_client, settings.RATE_LIMIT_TURNS_PER_MINUTE)
+
+# K-07.3 -- telemetry ingestion (stateless, shares the Supabase client)
+_telemetry_repository = TelemetryRepository(_supabase_client)
 
 
 def get_groq_client() -> Groq:
@@ -102,3 +106,7 @@ def get_turn_capacity_limiter() -> CapacityLimiter:
 
 def get_rate_limiter() -> RateLimiter:
     return _rate_limiter
+
+
+def get_telemetry_repository() -> TelemetryRepository:
+    return _telemetry_repository
