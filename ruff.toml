@@ -20,6 +20,9 @@ ignore = [
 "tests/**/*.py" = [
     "T20",    # print() permitido en tests
 ]
+"scripts/**/*.py" = [
+    "T20",    # print() permitido en scripts CLI (reporte de load test)
+]
 
 [lint.isort]
 known-first-party = ["app"]

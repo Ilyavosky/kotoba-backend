@@ -18,6 +18,7 @@ from app.core.deps import (
     get_groq_client,
     get_lesson_repository,
     get_module_repository,
+    get_rate_limiter,
     get_redis_repository,
     get_tts_service,
 )
@@ -213,6 +214,10 @@ def _override_all(
     app.dependency_overrides[get_redis_repository] = lambda: mock_redis
     app.dependency_overrides[get_decision_engine_service] = lambda: mock_engine
     app.dependency_overrides[get_module_repository] = lambda: mock_module
+    # Permissive rate limiter -- keeps unit tests off the real Redis client
+    permissive_limiter = MagicMock()
+    permissive_limiter.check = AsyncMock(return_value=None)
+    app.dependency_overrides[get_rate_limiter] = lambda: permissive_limiter
     try:
         yield
     finally:

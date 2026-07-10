@@ -7,6 +7,7 @@ from app.middleware.logging import RequestLoggingMiddleware
 from app.routers.conversation import router as conversation_router
 from app.routers.lessons import router as lessons_router
 from app.routers.progress import router as progress_router
+from app.routers.telemetry import router as telemetry_router
 from app.schemas.user import CurrentUser
 
 configure_logging()
@@ -15,6 +16,7 @@ app.add_middleware(RequestLoggingMiddleware)
 app.include_router(conversation_router)
 app.include_router(lessons_router)
 app.include_router(progress_router)
+app.include_router(telemetry_router)
 
 @app.get("/health")
 async def health() -> dict[str, str]:
