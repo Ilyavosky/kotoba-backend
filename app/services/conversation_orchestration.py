@@ -12,6 +12,7 @@ from app.schemas.conversation import ConversationTurnResponse
 from app.schemas.domain import ConversationTurn
 from app.services.agent_service import AgentService
 from app.services.decision_engine import DecisionEngineService
+from app.services.student_model_service import StudentModelService
 from app.services.tts_service import TtsService
 
 logger = structlog.get_logger(__name__)
@@ -29,6 +30,7 @@ class ConversationOrchestrationService:
         tts_service: TtsService,
         decision_engine: DecisionEngineService,
         module_repository: ModuleRepository,
+        student_model_service: StudentModelService,
     ) -> None:
         self.groq_client = groq_client
         self.repository = repository
@@ -37,6 +39,7 @@ class ConversationOrchestrationService:
         self.tts_service = tts_service
         self.decision_engine = decision_engine
         self.module_repository = module_repository
+        self.student_model_service = student_model_service
 
     async def process_turn(
         self, audio_bytes: bytes, lesson_id: str, user_id: str
@@ -48,6 +51,7 @@ class ConversationOrchestrationService:
 
         state = await self.decision_engine.get_current_state(user_id, lesson_id)
         step_context = self.decision_engine.get_step_context(state)
+        student_context = await self._load_student_context(user_id, lesson_id)
 
         # 2. Transcribe audio (ASR)
         transcription = await self._transcribe(audio_bytes)
@@ -58,18 +62,21 @@ class ConversationOrchestrationService:
             history=history,
             transcription=transcription,
             step_context=step_context,
+            student_context=student_context,
         )
         logger.info("agent_done", paso=razonamiento.get("paso_aplicado"))
 
         # 4. Kick off TTS concurrently -- it only needs `intervencion`, so it
         # overlaps with the state update and Redis persistence below.
-        # It degrades gracefully: synthesize() catches everything and returns
-        # None on failure, so awaiting it can never break the response.
         tts_task = asyncio.create_task(self.tts_service.synthesize(intervencion))
 
-        # 5. Update step state
+        # 5. update_after_turn on the student model never raises -- it degrades
+        # gracefully so a modeling failure can never break the turn.
         updated_state = await self.decision_engine.update_after_turn(
             user_id, lesson_id, state, razonamiento
+        )
+        await self.student_model_service.update_after_turn(
+            user_id, lesson_id, razonamiento
         )
 
         # 6. Resolve next lesson if current lesson just completed
@@ -105,6 +112,14 @@ class ConversationOrchestrationService:
             )
 
         return lesson, history
+
+    async def _load_student_context(self, user_id: str, lesson_id: str) -> str:
+        try:
+            model = await self.student_model_service.get_model(user_id, lesson_id)
+            return self.student_model_service.get_student_context(model)
+        except Exception as e:
+            logger.warning("student_model_load_failed", error=str(e))
+            return self.student_model_service.get_student_context(None)
 
     async def _transcribe(self, audio_bytes: bytes) -> str:
         try:

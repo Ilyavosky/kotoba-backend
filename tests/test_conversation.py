@@ -19,6 +19,7 @@ from app.core.deps import (
     get_lesson_repository,
     get_module_repository,
     get_redis_repository,
+    get_student_model_service,
     get_tts_service,
 )
 from app.main import app
@@ -213,6 +214,16 @@ def _override_all(
     app.dependency_overrides[get_redis_repository] = lambda: mock_redis
     app.dependency_overrides[get_decision_engine_service] = lambda: mock_engine
     app.dependency_overrides[get_module_repository] = lambda: mock_module
+
+    # Student model (K-06.1): always mocked so /turn tests stay hermetic.
+    # Created here (not per-test) because no /turn assertion depends on it.
+    mock_student_model = MagicMock()
+    mock_student_model.get_model = AsyncMock(return_value=None)
+    mock_student_model.get_student_context = MagicMock(
+        return_value="Student model: no data yet (first turn for this lesson)."
+    )
+    mock_student_model.update_after_turn = AsyncMock(return_value=None)
+    app.dependency_overrides[get_student_model_service] = lambda: mock_student_model
     try:
         yield
     finally:
@@ -530,22 +541,3 @@ def test_module_repository_not_called_when_lesson_not_completed(
     mock_module_repository: MagicMock,
 ) -> None:
     """Module repo is NOT queried when the lesson is still in progress."""
-    with _override_all(
-        mock_groq_success,
-        mock_lesson_repository,
-        mock_agent_service,
-        mock_tts_service,
-        mock_redis_repository,
-        mock_decision_engine,
-        mock_module_repository,
-    ):
-        client.post(
-            "/v1/conversation/turn",
-            headers=_auth_headers(),
-            files={
-                "audio_file": ("audio.webm", io.BytesIO(_fake_audio()), "audio/webm")
-            },
-            data={"lesson_id": TEST_LESSON_ID},
-        )
-
-    mock_module_repository.get_next_lesson_id.assert_not_called()

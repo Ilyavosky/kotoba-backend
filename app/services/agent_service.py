@@ -28,6 +28,7 @@ class AgentService:
         history: list[ConversationTurn],
         transcription: str,
         step_context: str,
+        student_context: str = "",
     ) -> tuple[str, AgentReasoning]:
         user_message = json.dumps(
             {
@@ -35,6 +36,7 @@ class AgentService:
                 "historial": history,
                 "turno_estudiante": transcription,
                 "contexto_paso": step_context,
+                "contexto_estudiante": student_context,
             },
             ensure_ascii=False,
         )
