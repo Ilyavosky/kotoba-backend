@@ -1,7 +1,9 @@
 from groq import Groq
 from supabase import Client, create_client
 
+from app.core.capacity import CapacityLimiter
 from app.core.config import settings
+from app.core.rate_limit import RateLimiter
 from app.core.redis import redis_client
 from app.repositories.conversation_context import ConversationContextRepository
 from app.repositories.decision_log_repository import DecisionLogRepository
@@ -10,6 +12,7 @@ from app.repositories.module_repository import ModuleRepository
 from app.repositories.step_state_repository import StepStateRepository
 from app.repositories.student_model_repository import StudentModelRepository
 from app.repositories.student_progress_repository import StudentProgressRepository
+from app.repositories.telemetry_repository import TelemetryRepository
 from app.services.agent_service import AgentService, load_agent_service
 from app.services.decision_engine import DecisionEngineService
 from app.services.student_model_service import StudentModelService
@@ -53,6 +56,15 @@ _decision_engine_service = DecisionEngineService(
 _student_model_repository = StudentModelRepository(redis_client, _supabase_client)
 
 _student_model_service = StudentModelService(_student_model_repository)
+# rate limiter for all /turn requests in this worker
+_turn_capacity_limiter = CapacityLimiter(
+    settings.MAX_CONCURRENT_TURNS, settings.TURN_QUEUE_TIMEOUT_SECONDS
+)
+
+_rate_limiter = RateLimiter(redis_client, settings.RATE_LIMIT_TURNS_PER_MINUTE)
+
+# K-07.3 -- telemetry ingestion (stateless, shares the Supabase client)
+_telemetry_repository = TelemetryRepository(_supabase_client)
 
 
 def get_groq_client() -> Groq:
@@ -101,3 +113,13 @@ def get_student_model_repository() -> StudentModelRepository:
 
 def get_student_model_service() -> StudentModelService:
     return _student_model_service
+def get_turn_capacity_limiter() -> CapacityLimiter:
+    return _turn_capacity_limiter
+
+
+def get_rate_limiter() -> RateLimiter:
+    return _rate_limiter
+
+
+def get_telemetry_repository() -> TelemetryRepository:
+    return _telemetry_repository
