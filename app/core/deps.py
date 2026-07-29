@@ -10,10 +10,12 @@ from app.repositories.decision_log_repository import DecisionLogRepository
 from app.repositories.lesson_repository import LessonRepository
 from app.repositories.module_repository import ModuleRepository
 from app.repositories.step_state_repository import StepStateRepository
+from app.repositories.student_model_repository import StudentModelRepository
 from app.repositories.student_progress_repository import StudentProgressRepository
 from app.repositories.telemetry_repository import TelemetryRepository
 from app.services.agent_service import AgentService, load_agent_service
 from app.services.decision_engine import DecisionEngineService
+from app.services.student_model_service import StudentModelService
 from app.services.tts_service import TtsService
 
 # Supabase client is created once at module load -- it's thread-safe and reusable
@@ -50,6 +52,10 @@ _decision_engine_service = DecisionEngineService(
     _decision_log_repository,
 )
 
+# Student model (K-06.1): Redis session copy + Supabase durable mirror
+_student_model_repository = StudentModelRepository(redis_client, _supabase_client)
+
+_student_model_service = StudentModelService(_student_model_repository)
 # rate limiter for all /turn requests in this worker
 _turn_capacity_limiter = CapacityLimiter(
     settings.MAX_CONCURRENT_TURNS, settings.TURN_QUEUE_TIMEOUT_SECONDS
@@ -92,6 +98,7 @@ def get_module_repository() -> ModuleRepository:
 def get_decision_engine_service() -> DecisionEngineService:
     return _decision_engine_service
 
+
 def get_student_progress_repository() -> StudentProgressRepository:
     return _student_progress_repository
 
@@ -100,6 +107,12 @@ def get_decision_log_repository() -> DecisionLogRepository:
     return _decision_log_repository
 
 
+def get_student_model_repository() -> StudentModelRepository:
+    return _student_model_repository
+
+
+def get_student_model_service() -> StudentModelService:
+    return _student_model_service
 def get_turn_capacity_limiter() -> CapacityLimiter:
     return _turn_capacity_limiter
 

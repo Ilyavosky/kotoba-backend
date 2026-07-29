@@ -59,7 +59,7 @@ The pedagogical agent uses this to modulate its behavior (e.g., be more correcti
 
 ---
 
-## 3. Student model — write-through cache (K-06.1)
+## 3. Progress persistence — write-through cache (K-06.2)
 
 Progress is persisted in two layers with different trade-offs.
 
@@ -87,6 +87,37 @@ Redis miss → Supabase query
 ```
 
 `turns_on_step` and `consecutive_errors` are not persisted in Supabase — they are in-session state. On a cold start they reset to 0, which is acceptable: the student needs at most 2 turns to re-confirm their step before advancing.
+
+---
+
+## 3b. Student model — vocabulary, errors & BKT (K-06.1)
+
+Per (user, lesson) pedagogical state, updated once per turn from the agent's
+`razonamiento`. Three dimensions
+
+### Persistence
+
+- **Redis:** `student:{user_id}:{lesson_id}`, TTL 24h — active session copy.
+- **Supabase:** `student_models` table (migration 008), upsert on every turn — durable mirror.
+- **Cold start:** Redis miss → Supabase read → Redis rehydrated.
+
+### Update flow (per turn)
+
+1. `ConversationOrchestrationService` loads the model and injects a compact
+   `contexto_estudiante` string into the agent prompt (mastery, frequent error
+   categories, struggling vocabulary).
+2. After the agent responds, `StudentModelService.update_after_turn` classifies
+   the detected error (`categoria_error` from the LLM, keyword fallback),
+   updates vocabulary exposures and applies one BKT step
+   (`correct = no error_detectado`).
+3. System errors (invalid LLM JSON) skip the update — they say nothing about
+   the student. Any internal failure is logged and swallowed: the student
+   model can never break `/turn`.
+
+### BKT parameters (v1)
+
+`P(L0)=0.2`, `P(T)=0.15`, `P(S)=0.10`, `P(G)=0.15`. Mastery levels:
+`introducing` (P(L) < 0.5), `practicing` (0.5–0.95), `mastered` (>= 0.95).
 
 ---
 
@@ -142,6 +173,8 @@ The Flutter client is responsible for routing: when `lesson_completed == true`, 
 | User progress | Supabase PostgreSQL | Durable step state | `user_progress(user_id, lesson_id)` |
 | Module definitions | Supabase PostgreSQL | Ordered lesson sequences | `modules` table |
 | Step state cache | Upstash Redis | Hot in-session state | `step:{uid}:{lid}` |
+| Student model | Supabase PostgreSQL | Durable vocabulary/errors/BKT | `student_models(user_id, lesson_id)` |
+| Student model cache | Upstash Redis | Hot in-session model | `student:{uid}:{lid}` |
 | Conversation history | Upstash Redis | LLM context window | `conv:{uid}:{lid}` |
 
 ---
@@ -153,3 +186,4 @@ The Flutter client is responsible for routing: when `lesson_completed == true`, 
 - **Supabase unavailable for step state:** Redis cache serves the state if warm; if both unavailable the turn will error.
 - **Groq ASR timeout (20s):** returns HTTP 502 to the client.
 - **TTS failure:** `audio_url` returns `null`; the client falls back to text-only display.
+- **Student model failure (Redis or Supabase):** logged as warning and skipped; the turn always completes.

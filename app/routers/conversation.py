@@ -12,6 +12,7 @@ from app.core.deps import (
     get_module_repository,
     get_rate_limiter,
     get_redis_repository,
+    get_student_model_service,
     get_tts_service,
     get_turn_capacity_limiter,
 )
@@ -23,6 +24,7 @@ from app.schemas.conversation import ConversationTurnResponse
 from app.services.agent_service import AgentService
 from app.services.conversation_orchestration import ConversationOrchestrationService
 from app.services.decision_engine import DecisionEngineService
+from app.services.student_model_service import StudentModelService
 from app.services.tts_service import TtsService
 
 router = APIRouter(prefix="/v1/conversation", tags=["conversation"])
@@ -40,6 +42,7 @@ async def conversation_turn(
     tts_service: TtsService = Depends(get_tts_service),
     decision_engine: DecisionEngineService = Depends(get_decision_engine_service),
     module_repository: ModuleRepository = Depends(get_module_repository),
+    student_model_service: StudentModelService = Depends(get_student_model_service),
     rate_limiter: RateLimiter = Depends(get_rate_limiter),
     capacity: CapacityLimiter = Depends(get_turn_capacity_limiter),
 ) -> ConversationTurnResponse:
@@ -62,6 +65,7 @@ async def conversation_turn(
         tts_service=tts_service,
         decision_engine=decision_engine,
         module_repository=module_repository,
+        student_model_service=student_model_service,
     )
     async with capacity:
         return await service.process_turn(

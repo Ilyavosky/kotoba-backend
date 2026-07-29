@@ -19,6 +19,7 @@ class AgentReasoning(TypedDict, total=False):
 
     paso_aplicado: str
     error_detectado: str | None
+    categoria_error: str | None
     vocabulario_activado: list[str]
     siguiente_objetivo: str
     error: str
